@@ -227,6 +227,71 @@ This section explains the common Flask components you will encounter in the exam
      app.register_blueprint(bp)
      ```
 
+### Blueprints — how they work and how to use them
+
+Blueprints are Flask's mechanism for organizing related routes, templates and static files into reusable components. They let you define routes and handlers outside the main application object and register those groups on an app instance later. This promotes modularity, avoids circular imports and makes testing easier.
+
+How they work (brief)
+- Create a Blueprint object in a module and decorate functions with @bp.route(...).
+- Register the Blueprint in your application factory with app.register_blueprint(bp, url_prefix=...).
+- After registration the Blueprint's routes become part of the application's URL map.
+
+Common patterns
+- Group related endpoints (e.g., auth, api, admin) into separate blueprints.
+- Use url_prefix to namespace routes (e.g., '/api', '/admin').
+- Keep route logic in blueprints and app configuration/extensions in the factory.
+
+Minimal example
+```python
+# app/routes.py
+from flask import Blueprint, jsonify
+bp = Blueprint('api', __name__)
+
+@bp.route('/health')
+def health():
+    return jsonify({"status": "ok"})
+```
+
+```python
+# app/__init__.py
+from flask import Flask
+from .routes import bp as api_bp
+
+def create_app():
+    app = Flask(__name__)
+    app.register_blueprint(api_bp, url_prefix='/api')
+    return app
+```
+
+Benefits
+- Clear separation of concerns and easier collaboration on larger projects.
+- Reusable route groups and simpler unit testing.
+- Helps scale the application structure as features grow.
+
+### Application factory pattern — brief explanation
+
+The application factory is a function (commonly named create_app) that builds and returns a configured Flask application instance. Use it to create app instances for different environments (development, testing, production) and to delay registering extensions and blueprints until an app exists.
+
+Why use it
+- Enables per-environment configuration without global state.
+- Makes testing easier (create a test app in your test setup).
+- Avoids circular imports by postponing registration until runtime.
+- Works cleanly with the Flask CLI (e.g., FLASK_APP="app:create_app").
+
+Minimal example:
+```python
+# app/__init__.py
+from flask import Flask
+
+def create_app(config=None):
+    app = Flask(__name__)
+    if config:
+        app.config.from_object(config)
+    from .routes import bp as api_bp
+    app.register_blueprint(api_bp, url_prefix='/api')
+    return app
+```
+
 10. Static files and templates
     - Flask serves static files placed in a "static" folder and renders templates using Jinja2 in the "templates" folder.
     - Example rendering:
@@ -291,4 +356,58 @@ This section explains the common Flask components you will encounter in the exam
     - parse_number helper: converts values to numeric types and returns None for invalid input.
     - Return: a JSON payload with original numbers and their sum, or 400 with an error message if validation fails.
 
-By adding these detailed explanations and small patterns to the README, the repository will be more useful to newcomers and easier to extend into a production-quality service.
+## New components (app factory, blueprints, validation & error handling)
+
+This project was reorganized to use a Flask application factory and Blueprints to separate responsibilities and make the app easier to test and deploy.
+
+- app/ (package)
+  - Purpose: contains the application factory and route definitions so the app can be created/configured from code or by the Flask CLI.
+  - Files:
+    - app/__init__.py — create_app(config) factory
+      - Creates and configures the Flask app (env-aware: FLASK_ENV).
+      - Registers the routes Blueprint.
+      - Registers a global JSON error handler so all HTTPExceptions and unexpected errors are returned as JSON.
+    - app/routes.py — routes Blueprint (registered as "api")
+      - Contains endpoint handlers: /sum, /multiply, /divide, /health.
+      - Implements input validation helpers that raise werkzeug HTTP exceptions (e.g., UnprocessableEntity for validation errors).
+      - Validation returns structured 422 responses for missing/invalid fields, e.g.
+        { "errors": { "a": "required" } }
+
+- app.py (root)
+  - Purpose: a small entry script that calls app.create_app() to create the Flask app instance.
+  - Allows running with `python app.py` and also supports the Flask CLI when using FLASK_APP=app:create_app.
+
+- Validation & error handling
+  - Validation:
+    - Inputs are parsed with a stricter parser that rejects missing or non-numeric values.
+    - Missing/invalid fields trigger a 422 Unprocessable Entity with a body like:
+      { "errors": { "a": "required", "b": "invalid" } }
+  - Error handling:
+    - The factory registers a global exception handler that:
+      - Converts werkzeug HTTPExceptions into JSON responses (honoring provided description dicts).
+      - Logs unexpected exceptions and returns a 500 JSON response: { "error": "Internal server error" }.
+    - Specific cases (e.g., division by zero) raise BadRequest (400) with JSON description.
+
+- Running the app
+  - Flask CLI (recommended)
+    - Unix/macOS:
+      export FLASK_APP="app:create_app"
+      export FLASK_ENV=development   # optional
+      flask run
+    - Windows (cmd.exe):
+      set FLASK_APP=app:create_app
+      set FLASK_ENV=development
+      flask run
+    - Windows (PowerShell):
+      $env:FLASK_APP = "app:create_app"
+      $env:FLASK_ENV = "development"
+      flask run
+  - Direct:
+    - python app.py
+
+- Notes
+  - The app now returns consistent JSON errors for validation and HTTP errors.
+  - The separate routes file and factory pattern make it easier to add configuration, testing, or extensions (e.g., DB) later.
+  - See notes/README.md for quick API tooling tips (curl, httpie, jq).
+
+Additions above are concise guidance for maintainers and contributors to understand the new structure and how to run and extend the application.
