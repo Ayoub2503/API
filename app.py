@@ -81,6 +81,10 @@ def divide_endpoint():
 
     return jsonify({"a": a_num, "b": b_num, "quotient": result}), 200
 
+@app.route('/health', methods=['GET'])
+def health():
+    return jsonify({"status": "ok"}), 200
+
 @app.errorhandler(404)
 def not_found(e):
     return jsonify({"error": "Not found"}), 404
