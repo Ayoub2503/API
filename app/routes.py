@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from werkzeug.exceptions import UnprocessableEntity, BadRequest
 
 bp = Blueprint('api', __name__)
@@ -46,10 +46,19 @@ def _get_a_b_from_request():
 @bp.route('/sum', methods=['GET', 'POST'])
 def sum_endpoint():
     a_raw, b_raw = _get_a_b_from_request()
+
+    # Log incoming inputs (avoid secrets)
+    current_app.logger.debug(f"sum_input raw a={a_raw} b={b_raw}")
+
     a_num, b_num = validate_and_parse(a_raw, b_raw)
+
     result = a_num + b_num
     if float(result).is_integer():
         result = int(result)
+
+    # Log parsed inputs and result
+    current_app.logger.info(f"sum_result a={a_num} b={b_num} sum={result}")
+
     return jsonify({"a": a_num, "b": b_num, "sum": result}), 200
 
 @bp.route('/multiply', methods=['GET', 'POST'])

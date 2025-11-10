@@ -356,6 +356,36 @@ def create_app(config=None):
     - parse_number helper: converts values to numeric types and returns None for invalid input.
     - Return: a JSON payload with original numbers and their sum, or 400 with an error message if validation fails.
 
+## Logging & debugging (development ergonomics)
+
+This project configures simple structured logging and enables the Flask debugger in development only.
+
+What is configured
+- The application factory sets up Python logging (stream handler + formatter) and chooses log level based on FLASK_ENV/DEBUG.
+- A request hook logs method, path, status and duration for every request in a single line:
+  method=GET path=/sum status=200 duration_ms=12
+- The /sum endpoint logs inputs (debug level) and the parsed result (info level), e.g.:
+  - DEBUG: sum_input raw a=3 b=5
+  - INFO:  sum_result a=3 b=5 sum=8
+
+How to use the debugger safely
+- Enable development mode (local only):
+  - Unix/macOS:
+    export FLASK_ENV=development
+    export FLASK_APP="app:create_app"
+    flask run
+  - Windows (PowerShell):
+    $env:FLASK_ENV = "development"
+    $env:FLASK_APP = "app:create_app"
+    flask run
+- In development the Flask debugger and reloader are enabled (useful for live reload and interactive tracebacks).
+- Never enable the debugger in production — it exposes interactive debug tools. The factory disables debug mode when FLASK_ENV != development.
+
+Tips
+- Use DEBUG-level logs to see raw inputs; use INFO for higher-level events and results.
+- In CI/production set FLASK_ENV=production (or avoid setting) so logs are INFO and debugger is disabled.
+- If you need structured log output (JSON), replace the formatter in app/__init__.py with a JSON formatter or use a logging library like structlog.
+
 ## New components (app factory, blueprints, validation & error handling)
 
 This project was reorganized to use a Flask application factory and Blueprints to separate responsibilities and make the app easier to test and deploy.
