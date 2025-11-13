@@ -440,4 +440,28 @@ This project was reorganized to use a Flask application factory and Blueprints t
   - The separate routes file and factory pattern make it easier to add configuration, testing, or extensions (e.g., DB) later.
   - See notes/README.md for quick API tooling tips (curl, httpie, jq).
 
-Additions above are concise guidance for maintainers and contributors to understand the new structure and how to run and extend the application.
+## Testing (unit & integration)
+
+This project includes pytest-based tests that exercise the /sum endpoint (both query-parameter GET and JSON POST), covering happy paths and validation/error cases.
+
+What is included
+- tests/conftest.py: pytest fixtures that create the Flask app via the factory and provide a test client.
+- tests/test_sum.py: tests asserting status codes and JSON responses for:
+  - successful GET and POST requests,
+  - missing fields (422 with {"errors": {"a": "required"}}),
+  - invalid numeric values (422 with {"errors": {"a": "invalid"}}),
+  - float results.
+
+Running tests
+1. Install pytest (if not already):
+   ```bash
+   pip install pytest
+   ```
+2. Run tests from repository root:
+   ```bash
+   pytest -q
+   ```
+
+Tips
+- Tests set app.config['TESTING']=True so exceptions surface appropriately.
+- Add more tests for multiply/divide and error branches (e.g., division by zero) following the provided examples.
